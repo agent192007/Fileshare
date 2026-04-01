@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}FileShare | Share Transfer{% endblock %}
+
+{% block content %}
+<section class="flex flex-1 items-center justify-center py-3 sm:py-5">
+    <div class="grid w-full max-w-5xl gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+
+        <!-- Share card -->
+        <div class="glass-card rounded-2xl p-5 sm:p-6">
+            <div class="flex flex-col gap-4">
+                <div class="space-y-1">
+                    <span class="inline-flex w-fit items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-widest text-primary">
+                        Share Ready
+                    </span>
+                    <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Your transfer is live</h1>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                        Share the QR code or session code with the receiver.
+                    </p>
+                </div>
+
+                <!-- QR Code -->
+                <div class="flex justify-center rounded-2xl glass-panel p-5">
+                    <img alt="QR code" class="h-[180px] w-[180px] rounded-xl bg-white p-3 shadow-md" src="data:image/png;base64,{{ qr_code }}" />
+                </div>
+
+                <!-- Session code -->
+                <div class="flex flex-col gap-2">
+                    <label class="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Session Code</label>
+                    <input type="text" id="session-id" readonly
+                        class="glass-input w-full rounded-xl px-4 py-3 text-center text-lg font-mono tracking-[0.25em] text-slate-900 dark:text-white focus:outline-none"
+                        value="{{ session_id }}" />
+                    <a href="{{ session_url }}" class="break-all text-xs font-medium text-primary hover:underline">{{ session_url }}</a>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="grid gap-2.5 sm:grid-cols-2">
+                    <button id="copy-btn" type="button"
+                            class="flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-all hover:bg-primary-hover hover:shadow-xl cursor-pointer">
+                        <span class="material-symbols-rounded text-[18px]" style="font-variation-settings:'FILL' 1">content_copy</span>
+                        Copy Code
+                    </button>
+                    <a href="{{ session_url }}"
+                       class="flex min-h-11 items-center justify-center gap-1.5 rounded-xl glass-input px-4 py-2.5 text-sm font-bold text-slate-900 dark:text-white transition-all hover:border-primary">
+                        <span class="material-symbols-rounded text-[18px]" style="font-variation-settings:'FILL' 1">folder_open</span>
+                        Preview Files
+                    </a>
+                    <a href="{{ download_url }}"
+                       class="flex min-h-11 items-center justify-center gap-1.5 rounded-xl glass-input px-4 py-2.5 text-sm font-bold text-slate-900 dark:text-white transition-all hover:border-primary">
+                        <span class="material-symbols-rounded text-[18px]" style="font-variation-settings:'FILL' 1">download</span>
+                        Download All
+                    </a>
+                    <button id="delete-btn" type="button"
+                            class="flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-red-700 cursor-pointer">
+                        <span class="material-symbols-rounded text-[18px]" style="font-variation-settings:'FILL' 1">delete</span>
+                        Delete Transfer
+                    </button>
+                </div>
+                <p id="delete-status" class="hidden text-sm font-medium text-slate-500 dark:text-slate-400"></p>
+            </div>
+        </div>
+
+        <!-- Files sidebar -->
+        <aside class="glass-dark rounded-2xl p-5 sm:p-6 text-white">
+            <div class="flex flex-col gap-4">
+                <div class="space-y-1">
+                    <span class="inline-flex w-fit items-center rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-widest text-white/75">
+                        Contents
+                    </span>
+                    <h2 class="text-lg font-bold">Files in this transfer</h2>
+                </div>
+                <div class="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                    {% for file in files %}
+                        <div class="flex items-center justify-between gap-3 rounded-xl bg-white/5 px-3.5 py-2.5 border border-white/5">
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-semibold text-white">{{ file.name }}</p>
+                                <p class="text-xs text-white/50">{{ file.type_label }} · {{ file.size_label }}</p>
+                            </div>
+                            <span class="inline-flex shrink-0 rounded-full bg-primary/20 px-2.5 py-0.5 text-[11px] font-bold text-primary">{{ file.type_label }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+                <p class="text-xs text-white/60">
+                    Receivers can browse this exact list before downloading.
+                </p>
+            </div>
+        </aside>
+    </div>
+</section>
+<form id="csrf-form">{% csrf_token %}</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const session_id = "{{ session_id|escapejs }}";
+    const deleteToken = sessionStorage.getItem(`delete-token:${session_id}`);
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                cookie = cookie.trim();
+                if (cookie.startsWith(name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    document.getElementById("copy-btn").addEventListener("click", () => {
+        navigator.clipboard.writeText(session_id)
+            .then(() => alert("Code copied to clipboard!"))
+            .catch(() => alert("Failed to copy code"));
+    });
+
+    const deleteBtn = document.getElementById("delete-btn");
+    const deleteStatus = document.getElementById("delete-status");
+
+    if (!deleteToken) {
+        deleteBtn.disabled = true;
+        deleteBtn.classList.add("opacity-50", "cursor-not-allowed");
+        deleteStatus.textContent = "Manual deletion is only available from the original uploader device.";
+        deleteStatus.classList.remove("hidden");
+    }
+
+    deleteBtn.addEventListener("click", async () => {
+        if (!deleteToken) return;
+
+        deleteBtn.disabled = true;
+        deleteStatus.textContent = "Deleting transfer...";
+        deleteStatus.classList.remove("hidden");
+
+        const formData = new FormData();
+        formData.append("session_id", session_id);
+        formData.append("delete_token", deleteToken);
+
+        try {
+            const response = await fetch("{% url 'cleanup' %}", {
+                method: "POST",
+                body: formData,
+                headers: { "X-CSRFToken": getCookie("csrftoken") }
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || "Cleanup failed");
+            }
+
+            sessionStorage.removeItem(`delete-token:${session_id}`);
+            deleteStatus.textContent = "Transfer deleted.";
+        } catch (error) {
+            console.error(error);
+            deleteBtn.disabled = false;
+            deleteStatus.textContent = error.message || "Cleanup failed";
+        }
+    });
+</script>
+{% endblock %}
