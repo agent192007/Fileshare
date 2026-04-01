@@ -78,6 +78,21 @@ class FileShareFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "/files/session-123/")
 
+    def test_show_qr_includes_exit_cleanup_script(self):
+        UploadedFile.objects.create(
+            session_id="session-123",
+            delete_token="token-123",
+            original_name="hello.txt",
+            file=SimpleUploadedFile("hello.txt", b"hello world"),
+        )
+
+        response = self.client.get(reverse("show_qr", kwargs={"session_id": "session-123"}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "navigator.sendBeacon")
+        self.assertContains(response, "pagehide")
+        self.assertContains(response, reverse("cleanup"))
+
     def test_download_returns_zip_archive(self):
         UploadedFile.objects.create(
             session_id="session-123",
