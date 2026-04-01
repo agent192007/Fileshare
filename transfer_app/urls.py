@@ -1,5 +1,11 @@
 from django.urls import path
+
+from config.env import load_env
+
 from . import views
+
+load_env()
+
 urlpatterns = [
     path("upload/", views.upload_file, name="upload_file"),
     path("", views.upload_page, name="upload_page"),

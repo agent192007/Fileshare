@@ -1,21 +1,11 @@
 import os
 from pathlib import Path
 
+from .env import env_bool, env_list, load_env
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-def env_bool(name, default=False):
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def env_list(name, default):
-    raw_value = os.getenv(name)
-    if not raw_value:
-        return default
-    return [item.strip() for item in raw_value.split(",") if item.strip()]
+load_env()
 
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-secret-key-change-me")

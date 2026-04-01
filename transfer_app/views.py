@@ -15,7 +15,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from config.env import load_env
+
 from .models import UploadedFile
+
+load_env()
 
 
 def _build_zip_entry_name(filename, seen_names):

@@ -6,7 +6,11 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from config.env import load_env
+
 from .models import UploadedFile
+
+load_env()
 
 
 class FileShareFlowTests(TestCase):

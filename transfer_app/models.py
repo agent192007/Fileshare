@@ -2,6 +2,10 @@ import uuid
 
 from django.db import models
 
+from config.env import load_env
+
+load_env()
+
 def upload_path(instance, filename):
     return f"uploads/{instance.session_id}/{filename}"
 
