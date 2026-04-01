@@ -91,7 +91,6 @@ class FileShareFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "navigator.sendBeacon")
         self.assertContains(response, "pagehide")
-        self.assertContains(response, "visibilitychange")
         self.assertContains(response, reverse("cleanup"))
 
     def test_download_returns_zip_archive(self):

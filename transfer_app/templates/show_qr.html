@@ -206,12 +206,6 @@
         queueExitCleanup();
     });
 
-    document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "hidden") {
-            queueExitCleanup();
-        }
-    });
-
     window.addEventListener("beforeunload", () => {
         queueExitCleanup();
     });
