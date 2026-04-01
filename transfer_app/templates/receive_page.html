@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}FileShare | Receive Files{% endblock %}
+
+{% block content %}
+<section class="flex flex-1 items-center justify-center py-3 sm:py-5">
+    <div class="flex w-full max-w-4xl flex-col items-center gap-5">
+
+        <!-- Hero text -->
+        <div class="flex max-w-2xl flex-col items-center gap-1.5 text-center">
+            <h1 class="text-slate-900 dark:text-white text-3xl sm:text-4xl font-bold leading-tight tracking-tight">
+                Open a received transfer
+            </h1>
+            <p class="text-slate-500 dark:text-slate-400 text-sm sm:text-base leading-relaxed">
+                Paste the share code you were given and jump straight to the file list page.
+            </p>
+        </div>
+
+        <!-- Two-column layout -->
+        <div class="grid w-full gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(250px,0.85fr)]">
+
+            <!-- Code entry card -->
+            <div class="glass-card rounded-2xl p-5 sm:p-6">
+                <div class="flex flex-col gap-5">
+                    <div class="space-y-1">
+                        <span class="inline-flex w-fit items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-widest text-primary">
+                            Receive
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Enter the session code</h2>
+                        <p class="text-sm text-slate-500 dark:text-slate-400">
+                            You'll see a file list where you can inspect before downloading.
+                        </p>
+                    </div>
+
+                    <form method="POST" class="flex flex-col gap-3.5">
+                        {% csrf_token %}
+                        <input type="text" name="session_id" required
+                            class="glass-input w-full rounded-2xl px-4 py-4 text-center text-xl font-mono tracking-[0.3em] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
+                            placeholder="ENTER CODE" />
+                        <button type="submit"
+                            class="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-all hover:bg-primary-hover hover:shadow-xl cursor-pointer">
+                            <span class="material-symbols-rounded text-lg" style="font-variation-settings:'FILL' 1">login</span>
+                            Open Transfer
+                        </button>
+                        {% if error %}
+                            <p class="rounded-xl bg-red-500/10 px-3.5 py-2.5 text-sm font-medium text-red-600 dark:text-red-400">{{ error }}</p>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <aside class="glass-dark rounded-2xl p-5 sm:p-6 text-white">
+                <div class="space-y-4">
+                    <span class="inline-flex w-fit items-center rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-widest text-white/75">
+                        Workflow
+                    </span>
+                    <h2 class="text-lg font-bold">Receiver workflow</h2>
+                    <div class="space-y-2.5 text-sm text-white/70">
+                        <div class="flex gap-2.5">
+                            <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">1</span>
+                            <p>Enter the code or scan the QR code.</p>
+                        </div>
+                        <div class="flex gap-2.5">
+                            <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">2</span>
+                            <p>Review the files shown in the transfer page.</p>
+                        </div>
+                        <div class="flex gap-2.5">
+                            <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">3</span>
+                            <p>Download one file or grab everything as a ZIP.</p>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+</section>
+{% endblock %}

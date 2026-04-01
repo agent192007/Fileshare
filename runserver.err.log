@@ -1,0 +1,38 @@
+Watching for file changes with StatReloader
+[01/Apr/2026 02:04:05] "GET / HTTP/1.1" 200 12727
+[01/Apr/2026 02:04:05,217] - Broken pipe from ('127.0.0.1', 54670)
+[01/Apr/2026 02:05:07] "GET / HTTP/1.1" 200 12727
+[01/Apr/2026 02:05:16] "GET /receive/ HTTP/1.1" 200 6760
+[01/Apr/2026 02:05:18] "GET / HTTP/1.1" 200 12727
+[01/Apr/2026 02:05:43] "POST /upload/ HTTP/1.1" 200 122
+[01/Apr/2026 02:05:44] "GET /qr/ae14ff99-100f-4f9c-b7d9-bea3c55496d9/ HTTP/1.1" 200 12264
+[01/Apr/2026 02:05:58] "GET /receive/ HTTP/1.1" 200 6760
+[01/Apr/2026 02:06:03] "POST /receive/ HTTP/1.1" 302 0
+[01/Apr/2026 02:06:03] "GET /files/ae14ff99-100f-4f9c-b7d9-bea3c55496d9/ HTTP/1.1" 200 9421
+[01/Apr/2026 02:06:06] "GET /files/ae14ff99-100f-4f9c-b7d9-bea3c55496d9/4/download/ HTTP/1.1" 200 141456
+[01/Apr/2026 02:06:08] "GET /files/ae14ff99-100f-4f9c-b7d9-bea3c55496d9/5/download/ HTTP/1.1" 200 1585466
+[01/Apr/2026 02:06:24] "GET /receive/ HTTP/1.1" 200 6760
+[01/Apr/2026 02:06:29] "POST /receive/ HTTP/1.1" 302 0
+[01/Apr/2026 02:06:29] "GET /files/ae14ff99-100f-4f9c-b7d9-bea3c55496d9/ HTTP/1.1" 200 9421
+[01/Apr/2026 02:32:04] "GET /qr/42c60b16-6b2d-4cf6-b275-af1ad4769a8e/ HTTP/1.1" 200 17314
+[01/Apr/2026 02:32:42] "GET / HTTP/1.1" 200 17352
+[01/Apr/2026 02:33:18] "POST /upload/ HTTP/1.1" 200 122
+[01/Apr/2026 02:33:18] "GET /qr/96f3812f-f1c5-4915-9f95-64dc56c39899/ HTTP/1.1" 200 17166
+[01/Apr/2026 02:34:18] "GET /files/96f3812f-f1c5-4915-9f95-64dc56c39899/ HTTP/1.1" 200 14666
+Not Found: /favicon.ico
+[01/Apr/2026 02:34:19] "GET /favicon.ico HTTP/1.1" 404 4389
+[01/Apr/2026 02:35:30] "GET / HTTP/1.1" 200 17352
+Not Found: /.well-known/appspecific/com.chrome.devtools.json
+[01/Apr/2026 02:36:31] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 4500
+[01/Apr/2026 02:39:02] "GET / HTTP/1.1" 200 16598
+Not Found: /.well-known/appspecific/com.chrome.devtools.json
+[01/Apr/2026 02:39:02] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 4500
+[01/Apr/2026 02:39:21] "GET / HTTP/1.1" 200 16880
+Not Found: /.well-known/appspecific/com.chrome.devtools.json
+[01/Apr/2026 02:39:21] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 4500
+[01/Apr/2026 02:41:11] "GET /receive/ HTTP/1.1" 200 11602
+[01/Apr/2026 02:41:13] "GET / HTTP/1.1" 200 16880
+[01/Apr/2026 02:43:02] "GET /receive/ HTTP/1.1" 200 11602
+[01/Apr/2026 02:43:03] "GET / HTTP/1.1" 200 16880
+[01/Apr/2026 02:43:03] "GET /receive/ HTTP/1.1" 200 11602
+[01/Apr/2026 02:43:09] "GET / HTTP/1.1" 200 16880
