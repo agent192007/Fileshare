@@ -123,27 +123,32 @@
     const deleteStatus = document.getElementById("delete-status");
     const preserveTransferLinks = document.querySelectorAll("[data-preserve-transfer='true']");
 
+    function buildCleanupPayload() {
+        const payload = new URLSearchParams();
+        payload.append("session_id", session_id);
+        payload.append("delete_token", deleteToken);
+        payload.append("csrfmiddlewaretoken", getCookie("csrftoken") || "");
+        return payload;
+    }
+
     function queueExitCleanup() {
         if (!shouldCleanupOnExit || !deleteToken || cleanupRequested) return;
 
         cleanupRequested = true;
-
-        const formData = new FormData();
-        formData.append("session_id", session_id);
-        formData.append("delete_token", deleteToken);
-        formData.append("csrfmiddlewaretoken", getCookie("csrftoken"));
+        const payload = buildCleanupPayload();
 
         sessionStorage.removeItem(`delete-token:${session_id}`);
 
-        if (navigator.sendBeacon && navigator.sendBeacon(cleanupUrl, formData)) {
+        if (navigator.sendBeacon && navigator.sendBeacon(cleanupUrl, payload)) {
             return;
         }
 
         fetch(cleanupUrl, {
             method: "POST",
-            body: formData,
+            body: payload.toString(),
             keepalive: true,
             credentials: "same-origin",
+            headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
         }).catch(() => {});
     }
 
@@ -199,6 +204,12 @@
     window.addEventListener("pagehide", (event) => {
         if (event.persisted) return;
         queueExitCleanup();
+    });
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") {
+            queueExitCleanup();
+        }
     });
 
     window.addEventListener("beforeunload", () => {
