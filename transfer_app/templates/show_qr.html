@@ -2,6 +2,10 @@
 
 {% block title %}FileShare | Share Transfer{% endblock %}
 
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <section class="flex flex-1 items-center justify-center py-3 sm:py-5">
     <div class="grid w-full max-w-5xl gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -10,9 +14,17 @@
         <div class="glass-card rounded-2xl p-5 sm:p-6">
             <div class="flex flex-col gap-4">
                 <div class="space-y-1">
-                    <span class="inline-flex w-fit items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-widest text-primary">
-                        Share Ready
-                    </span>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="inline-flex w-fit items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-widest text-primary">
+                            Share Ready
+                        </span>
+                        {% if is_encrypted %}
+                        <span class="inline-flex w-fit items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-0.5 text-[11px] font-bold text-green-600 dark:text-green-400">
+                            <span class="material-symbols-rounded text-[14px]" style="font-variation-settings:'FILL' 1">enhanced_encryption</span>
+                            E2EE
+                        </span>
+                        {% endif %}
+                    </div>
                     <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Your transfer is live</h1>
                     <p class="text-sm text-slate-500 dark:text-slate-400">
                         Share the QR code or session code with the receiver.
@@ -21,7 +33,9 @@
 
                 <!-- QR Code -->
                 <div class="flex justify-center rounded-2xl glass-panel p-5">
-                    <img alt="QR code" class="h-[180px] w-[180px] rounded-xl bg-white p-3 shadow-md" src="data:image/png;base64,{{ qr_code }}" />
+                    <div id="qr-container">
+                        <img id="qr-img" alt="QR code" class="h-[180px] w-[180px] rounded-xl bg-white p-3 shadow-md" src="data:image/png;base64,{{ qr_code }}" />
+                    </div>
                 </div>
 
                 <!-- Session code -->
@@ -30,8 +44,16 @@
                     <input type="text" id="session-id" readonly
                         class="glass-input w-full rounded-xl px-4 py-3 text-center text-lg font-mono tracking-[0.25em] text-slate-900 dark:text-white focus:outline-none"
                         value="{{ session_id }}" />
-                    <a href="{{ session_url }}" class="break-all text-xs font-medium text-primary hover:underline">{{ session_url }}</a>
+                    <a href="{{ session_url }}" id="session-url-link" class="break-all text-xs font-medium text-primary hover:underline">{{ session_url }}</a>
                 </div>
+
+                <!-- Expiry info -->
+                {% if expires_at %}
+                <div class="flex items-center gap-2 rounded-xl bg-amber-500/10 px-3.5 py-2.5">
+                    <span class="material-symbols-rounded text-amber-600 dark:text-amber-400 text-[18px]" style="font-variation-settings:'FILL' 1">schedule</span>
+                    <span class="text-xs font-semibold text-amber-700 dark:text-amber-400">Expires in <span id="expiry-countdown" data-expires="{{ expires_at|date:'c' }}"></span></span>
+                </div>
+                {% endif %}
 
                 <!-- Action buttons -->
                 <div class="grid gap-2.5 sm:grid-cols-2">
@@ -40,7 +62,7 @@
                         <span class="material-symbols-rounded text-[18px]" style="font-variation-settings:'FILL' 1">content_copy</span>
                         Copy Code
                     </button>
-                    <a href="{{ session_url }}" data-preserve-transfer="true"
+                    <a href="{{ session_url }}" id="preview-link" data-preserve-transfer="true"
                        class="flex min-h-11 items-center justify-center gap-1.5 rounded-xl glass-input px-4 py-2.5 text-sm font-bold text-slate-900 dark:text-white transition-all hover:border-primary">
                         <span class="material-symbols-rounded text-[18px]" style="font-variation-settings:'FILL' 1">folder_open</span>
                         Preview Files
@@ -94,7 +116,9 @@
 <script>
     const session_id = "{{ session_id|escapejs }}";
     const deleteToken = sessionStorage.getItem(`delete-token:${session_id}`);
+    const encryptionKey = sessionStorage.getItem(`encryption-key:${session_id}`);
     const cleanupUrl = "{% url 'cleanup' %}";
+    const isEncrypted = {{ is_encrypted|yesno:"true,false" }};
     let shouldCleanupOnExit = Boolean(deleteToken);
     let cleanupRequested = false;
 
@@ -113,12 +137,57 @@
         return cookieValue;
     }
 
+    // ── Rebuild QR & URLs when encryption key is present ──────────
+    if (isEncrypted && encryptionKey) {
+        const baseUrl = "{{ session_url|escapejs }}";
+        const fullUrl = baseUrl + "#" + encryptionKey;
+
+        // Update session code display to combined code
+        const sessionInput = document.getElementById("session-id");
+        sessionInput.value = session_id + "#" + encryptionKey;
+
+        // Update links
+        document.getElementById("session-url-link").href = fullUrl;
+        document.getElementById("session-url-link").textContent = fullUrl;
+        document.getElementById("preview-link").href = fullUrl;
+
+        // Regenerate QR with the full URL (including key fragment)
+        try {
+            var qr = qrcode(0, "M");
+            qr.addData(fullUrl);
+            qr.make();
+            var imgEl = document.getElementById("qr-img");
+            imgEl.src = qr.createDataURL(10, 2);
+        } catch (e) {
+            console.error("Client-side QR generation failed, using server QR:", e);
+        }
+    }
+
+    // ── Expiry countdown ─────────────────────────────────────────
+    (function() {
+        var el = document.getElementById("expiry-countdown");
+        if (!el) return;
+        var expiresAt = new Date(el.dataset.expires);
+        function update() {
+            var diff = expiresAt - Date.now();
+            if (diff <= 0) { el.textContent = "Expired"; return; }
+            var h = Math.floor(diff / 3600000);
+            var m = Math.floor((diff % 3600000) / 60000);
+            el.textContent = h > 0 ? h + "h " + m + "m" : m + "m";
+        }
+        update();
+        setInterval(update, 60000);
+    })();
+
+    // ── Copy button ──────────────────────────────────────────────
     document.getElementById("copy-btn").addEventListener("click", () => {
-        navigator.clipboard.writeText(session_id)
+        const code = document.getElementById("session-id").value;
+        navigator.clipboard.writeText(code)
             .then(() => alert("Code copied to clipboard!"))
             .catch(() => alert("Failed to copy code"));
     });
 
+    // ── Delete & cleanup ─────────────────────────────────────────
     const deleteBtn = document.getElementById("delete-btn");
     const deleteStatus = document.getElementById("delete-status");
     const preserveTransferLinks = document.querySelectorAll("[data-preserve-transfer='true']");
@@ -138,6 +207,7 @@
         const payload = buildCleanupPayload();
 
         sessionStorage.removeItem(`delete-token:${session_id}`);
+        sessionStorage.removeItem(`encryption-key:${session_id}`);
 
         if (navigator.sendBeacon && navigator.sendBeacon(cleanupUrl, payload)) {
             return;
@@ -191,6 +261,7 @@
             }
 
             sessionStorage.removeItem(`delete-token:${session_id}`);
+            sessionStorage.removeItem(`encryption-key:${session_id}`);
             deleteStatus.textContent = "Transfer deleted.";
         } catch (error) {
             console.error(error);

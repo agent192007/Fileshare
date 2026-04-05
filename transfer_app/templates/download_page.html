@@ -2,15 +2,29 @@
 
 {% block title %}FileShare | Transfer Files{% endblock %}
 
+{% block head %}
+{% if is_encrypted %}
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+{% endif %}
+{% endblock %}
+
 {% block content %}
 <section class="flex flex-1 items-center justify-center py-3 sm:py-5">
     <div class="flex w-full max-w-5xl flex-col gap-5">
 
         <!-- Header -->
         <div class="flex flex-col gap-1.5 text-center sm:text-left">
-            <span class="inline-flex w-fit self-center sm:self-start items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-widest text-primary">
-                Transfer
-            </span>
+            <div class="flex items-center gap-2 flex-wrap justify-center sm:justify-start">
+                <span class="inline-flex w-fit items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-widest text-primary">
+                    Transfer
+                </span>
+                {% if is_encrypted %}
+                <span class="inline-flex w-fit items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-0.5 text-[11px] font-bold text-green-600 dark:text-green-400">
+                    <span class="material-symbols-rounded text-[14px]" style="font-variation-settings:'FILL' 1">enhanced_encryption</span>
+                    End-to-end encrypted
+                </span>
+                {% endif %}
+            </div>
             <h1 class="text-slate-900 dark:text-white text-3xl sm:text-4xl font-bold leading-tight tracking-tight">
                 Files ready for download
             </h1>
@@ -19,8 +33,17 @@
             </p>
         </div>
 
+        <!-- E2EE key-missing warning (hidden by default, shown by JS if needed) -->
+        {% if is_encrypted %}
+        <div id="key-missing-alert" class="hidden rounded-2xl bg-red-500/10 border border-red-500/20 p-5 text-center">
+            <span class="material-symbols-rounded text-4xl text-red-500 mb-2" style="font-variation-settings:'FILL' 1">key_off</span>
+            <p class="text-sm font-bold text-red-600 dark:text-red-400">Encryption key not found</p>
+            <p class="text-xs text-red-500 dark:text-red-400/70 mt-1">This transfer is end-to-end encrypted. Ask the sender for the full share code (including the key after #).</p>
+        </div>
+        {% endif %}
+
         <!-- Two-column layout -->
-        <div class="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(250px,0.85fr)]">
+        <div id="files-section" class="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(250px,0.85fr)]">
 
             <!-- File list card -->
             <div class="glass-card rounded-2xl p-5 sm:p-6">
@@ -54,11 +77,20 @@
                                     <p class="text-xs text-slate-500 dark:text-slate-400">{{ file.type_label }} · {{ file.size_label }}</p>
                                 </div>
                             </div>
+                            {% if is_encrypted %}
+                            <button type="button"
+                               class="decrypt-download-btn inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-md shadow-primary/20 transition-all hover:bg-primary-hover hover:shadow-lg cursor-pointer"
+                               data-url="{{ file.download_url }}" data-filename="{{ file.name }}">
+                                <span class="material-symbols-rounded text-[16px]" style="font-variation-settings:'FILL' 1">download</span>
+                                Download
+                            </button>
+                            {% else %}
                             <a href="{{ file.download_url }}"
                                class="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-md shadow-primary/20 transition-all hover:bg-primary-hover hover:shadow-lg">
                                 <span class="material-symbols-rounded text-[16px]" style="font-variation-settings:'FILL' 1">download</span>
                                 Download
                             </a>
+                            {% endif %}
                         </div>
                     {% endfor %}
                 </div>
@@ -86,16 +118,186 @@
                                 <p>Each file keeps its original filename when downloaded.</p>
                             </div>
                         </div>
+
+                        {% if expires_at %}
+                        <div class="flex items-center gap-2 rounded-xl bg-white/10 px-3.5 py-2.5 mt-3">
+                            <span class="material-symbols-rounded text-amber-400 text-[18px]" style="font-variation-settings:'FILL' 1">schedule</span>
+                            <span class="text-xs font-semibold text-white/80">Expires in <span id="expiry-countdown" data-expires="{{ expires_at|date:'c' }}"></span></span>
+                        </div>
+                        {% endif %}
                     </div>
 
+                    <!-- Download-all status -->
+                    <div id="download-all-status" class="hidden rounded-xl bg-white/10 px-3.5 py-2.5 text-sm text-white/80"></div>
+
+                    {% if is_encrypted %}
+                    <button id="download-all-btn" type="button"
+                       class="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-all hover:bg-primary-hover hover:shadow-xl cursor-pointer">
+                        <span class="material-symbols-rounded text-lg" style="font-variation-settings:'FILL' 1">folder_zip</span>
+                        Download All as ZIP
+                    </button>
+                    {% else %}
                     <a href="{{ download_url }}"
                        class="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-all hover:bg-primary-hover hover:shadow-xl">
                         <span class="material-symbols-rounded text-lg" style="font-variation-settings:'FILL' 1">folder_zip</span>
                         Download All as ZIP
                     </a>
+                    {% endif %}
                 </div>
             </aside>
         </div>
     </div>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const isEncrypted = {{ is_encrypted|yesno:"true,false" }};
+    const sessionId = "{{ session_id|escapejs }}";
+
+    // ── Expiry countdown ──────────────────────────────────────────
+    (function() {
+        var el = document.getElementById("expiry-countdown");
+        if (!el) return;
+        var expiresAt = new Date(el.dataset.expires);
+        function update() {
+            var diff = expiresAt - Date.now();
+            if (diff <= 0) { el.textContent = "Expired"; return; }
+            var h = Math.floor(diff / 3600000);
+            var m = Math.floor((diff % 3600000) / 60000);
+            el.textContent = h > 0 ? h + "h " + m + "m" : m + "m";
+        }
+        update();
+        setInterval(update, 60000);
+    })();
+
+    // ── E2EE decrypt logic ────────────────────────────────────────
+    if (isEncrypted) {
+        (async function() {
+            // Get encryption key from URL hash or sessionStorage
+            let keyB64 = window.location.hash.slice(1) ||
+                         sessionStorage.getItem(`encryption-key:${sessionId}`) ||
+                         "";
+
+            // Persist across page loads
+            if (window.location.hash.slice(1)) {
+                sessionStorage.setItem(`encryption-key:${sessionId}`, window.location.hash.slice(1));
+            }
+
+            if (!keyB64) {
+                document.getElementById("key-missing-alert").classList.remove("hidden");
+                // Disable all download buttons
+                document.querySelectorAll(".decrypt-download-btn").forEach(btn => {
+                    btn.disabled = true;
+                    btn.classList.add("opacity-40", "cursor-not-allowed");
+                });
+                var dlAllBtn = document.getElementById("download-all-btn");
+                if (dlAllBtn) {
+                    dlAllBtn.disabled = true;
+                    dlAllBtn.classList.add("opacity-40", "cursor-not-allowed");
+                }
+                return;
+            }
+
+            // Import key
+            let cryptoKey;
+            try {
+                const padded = keyB64.replace(/-/g, "+").replace(/_/g, "/");
+                const raw = Uint8Array.from(atob(padded), c => c.charCodeAt(0));
+                cryptoKey = await crypto.subtle.importKey(
+                    "raw", raw, "AES-GCM", false, ["decrypt"]
+                );
+            } catch (e) {
+                console.error("Failed to import encryption key:", e);
+                document.getElementById("key-missing-alert").classList.remove("hidden");
+                return;
+            }
+
+            async function decryptBlob(encryptedData) {
+                const data = new Uint8Array(encryptedData);
+                const iv = data.slice(0, 12);
+                const ciphertext = data.slice(12);
+                const plaintext = await crypto.subtle.decrypt(
+                    { name: "AES-GCM", iv }, cryptoKey, ciphertext
+                );
+                return plaintext;
+            }
+
+            function saveBlob(blob, filename) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            // Single file download
+            document.querySelectorAll(".decrypt-download-btn").forEach(btn => {
+                btn.addEventListener("click", async function() {
+                    const url = this.dataset.url;
+                    const filename = this.dataset.filename;
+                    const originalText = this.innerHTML;
+
+                    this.disabled = true;
+                    this.innerHTML = '<span class="material-symbols-rounded text-[16px] animate-spin">progress_activity</span> Decrypting...';
+
+                    try {
+                        const resp = await fetch(url);
+                        if (!resp.ok) throw new Error("Download failed");
+                        const encrypted = await resp.arrayBuffer();
+                        const decrypted = await decryptBlob(encrypted);
+                        saveBlob(new Blob([decrypted]), filename);
+                    } catch (e) {
+                        console.error(e);
+                        alert("Decryption failed: " + e.message);
+                    } finally {
+                        this.disabled = false;
+                        this.innerHTML = originalText;
+                    }
+                });
+            });
+
+            // Download all as ZIP (client-side)
+            var dlAllBtn = document.getElementById("download-all-btn");
+            if (dlAllBtn) {
+                dlAllBtn.addEventListener("click", async function() {
+                    const statusEl = document.getElementById("download-all-status");
+                    this.disabled = true;
+
+                    try {
+                        const buttons = document.querySelectorAll(".decrypt-download-btn");
+                        const zip = new JSZip();
+                        let i = 0;
+
+                        for (const btn of buttons) {
+                            i++;
+                            statusEl.textContent = `Decrypting file ${i} of ${buttons.length}...`;
+                            statusEl.classList.remove("hidden");
+
+                            const resp = await fetch(btn.dataset.url);
+                            if (!resp.ok) throw new Error("Download failed for " + btn.dataset.filename);
+                            const encrypted = await resp.arrayBuffer();
+                            const decrypted = await decryptBlob(encrypted);
+                            zip.file(btn.dataset.filename, decrypted);
+                        }
+
+                        statusEl.textContent = "Building ZIP...";
+                        const zipBlob = await zip.generateAsync({ type: "blob" });
+                        saveBlob(zipBlob, `files_${sessionId}.zip`);
+                        statusEl.textContent = "Download complete!";
+                    } catch (e) {
+                        console.error(e);
+                        statusEl.textContent = "Failed: " + e.message;
+                        alert("ZIP creation failed: " + e.message);
+                    } finally {
+                        this.disabled = false;
+                    }
+                });
+            }
+        })();
+    }
+</script>
 {% endblock %}

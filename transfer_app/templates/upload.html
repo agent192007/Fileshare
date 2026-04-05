@@ -92,6 +92,30 @@
               No files selected yet.
             </p>
           </div>
+
+          <!-- Security options -->
+          <div class="glass-panel rounded-2xl p-3.5 space-y-3">
+            <p class="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+              Security Options
+            </p>
+            <!-- E2EE toggle -->
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input type="checkbox" id="encrypt-toggle"
+                class="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/30" />
+              <div>
+                <p class="text-sm font-semibold text-slate-900 dark:text-white">End-to-end encryption</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Files are encrypted in your browser before upload</p>
+              </div>
+            </label>
+            <!-- Password -->
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs font-semibold text-slate-700 dark:text-slate-300" for="password-input">
+                Password protection <span class="text-slate-400 font-normal">(optional)</span>
+              </label>
+              <input type="password" id="password-input" placeholder="Set a password for this transfer"
+                class="glass-input w-full rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none" />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -130,6 +154,9 @@
             </div>
           </div>
 
+          <!-- Status -->
+          <div id="upload-status" class="hidden rounded-xl bg-white/10 px-3.5 py-2.5 text-sm text-white/80"></div>
+
           <button
             id="upload-btn"
             type="button"
@@ -137,7 +164,7 @@
             disabled
           >
             <span
-              class="material-sycmdmbols-rounded text-lg mr-2"
+              class="material-symbols-rounded text-lg mr-2"
               style="font-variation-settings: &quot;FILL&quot; 1"
               >rocket_launch</span
             >
@@ -151,6 +178,8 @@
 <form id="csrf-form">{% csrf_token %}</form>
 {% endblock %} {% block scripts %}
 <script>
+  const BLOCKED_EXTENSIONS = {{ blocked_extensions_json|safe }};
+
   let session_id = crypto.randomUUID();
   let delete_token = crypto.randomUUID().replaceAll("-", "");
 
@@ -175,7 +204,26 @@
   const uploadBtn = document.getElementById("upload-btn");
   const fileCount = document.getElementById("file-count");
   const emptyState = document.getElementById("empty-state");
+  const statusEl = document.getElementById("upload-status");
   let fileBuffer = [];
+
+  function getFileExtension(name) {
+    const dot = name.lastIndexOf(".");
+    return dot >= 0 ? name.substring(dot).toLowerCase() : "";
+  }
+
+  function isBlocked(file) {
+    return BLOCKED_EXTENSIONS.includes(getFileExtension(file.name));
+  }
+
+  function showStatus(msg) {
+    statusEl.textContent = msg;
+    statusEl.classList.remove("hidden");
+  }
+
+  function hideStatus() {
+    statusEl.classList.add("hidden");
+  }
 
   function renderPreview() {
     previewList.innerHTML = "";
@@ -183,13 +231,15 @@
     fileCount.textContent = `${fileBuffer.length} file${fileBuffer.length === 1 ? "" : "s"}`;
 
     fileBuffer.forEach((file, index) => {
+      const blocked = isBlocked(file);
       const li = document.createElement("li");
       li.className =
-        "flex items-center justify-between gap-3 rounded-xl glass-input px-3.5 py-2.5";
+        "flex items-center justify-between gap-3 rounded-xl glass-input px-3.5 py-2.5" +
+        (blocked ? " border-2 border-red-400/50" : "");
       li.innerHTML = `
                 <div class="min-w-0">
                     <p class="truncate text-sm font-semibold text-slate-900 dark:text-white">${file.name}</p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">${(file.size / 1024).toFixed(1)} KB</p>
+                    <p class="text-xs ${blocked ? 'text-red-500 font-semibold' : 'text-slate-500 dark:text-slate-400'}">${blocked ? 'Blocked file type' : (file.size / 1024).toFixed(1) + ' KB'}</p>
                 </div>
                 <button type="button" class="remove-file inline-flex items-center rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer">Remove</button>
             `;
@@ -200,7 +250,8 @@
       previewList.appendChild(li);
     });
 
-    uploadBtn.disabled = fileBuffer.length === 0;
+    const hasBlocked = fileBuffer.some(isBlocked);
+    uploadBtn.disabled = fileBuffer.length === 0 || hasBlocked;
   }
 
   selectBtn.addEventListener("click", () => {
@@ -224,15 +275,72 @@
     };
   });
 
+  // ── Encryption helpers ────────────────────────────────────────────
+
+  async function generateEncryptionKey() {
+    return crypto.subtle.generateKey(
+      { name: "AES-GCM", length: 256 },
+      true,
+      ["encrypt", "decrypt"]
+    );
+  }
+
+  async function exportKeyToBase64Url(cryptoKey) {
+    const raw = await crypto.subtle.exportKey("raw", cryptoKey);
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(raw)));
+    return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  async function encryptFile(file, cryptoKey) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const plaintext = await file.arrayBuffer();
+    const ciphertext = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      cryptoKey,
+      plaintext
+    );
+    const combined = new Uint8Array(iv.byteLength + ciphertext.byteLength);
+    combined.set(iv, 0);
+    combined.set(new Uint8Array(ciphertext), iv.byteLength);
+    return new File([combined], file.name, { type: "application/octet-stream" });
+  }
+
+  // ── Upload ────────────────────────────────────────────────────────
+
   uploadBtn.addEventListener("click", async () => {
     if (!fileBuffer.length) return;
 
-    const formData = new FormData();
-    fileBuffer.forEach((file) => formData.append("files[]", file));
-    formData.append("session_id", session_id);
-    formData.append("delete_token", delete_token);
+    const doEncrypt = document.getElementById("encrypt-toggle").checked;
+    const password = document.getElementById("password-input").value.trim();
+
+    uploadBtn.disabled = true;
+    let encryptionKeyB64 = null;
+    let processedFiles = fileBuffer;
 
     try {
+      if (doEncrypt) {
+        showStatus("Encrypting files...");
+        const cryptoKey = await generateEncryptionKey();
+        encryptionKeyB64 = await exportKeyToBase64Url(cryptoKey);
+
+        processedFiles = [];
+        for (let i = 0; i < fileBuffer.length; i++) {
+          showStatus(`Encrypting file ${i + 1} of ${fileBuffer.length}...`);
+          processedFiles.push(await encryptFile(fileBuffer[i], cryptoKey));
+        }
+      }
+
+      showStatus("Uploading...");
+
+      const formData = new FormData();
+      processedFiles.forEach((file) => formData.append("files[]", file));
+      formData.append("session_id", session_id);
+      formData.append("delete_token", delete_token);
+      formData.append("is_encrypted", doEncrypt ? "true" : "false");
+      if (password) {
+        formData.append("password", password);
+      }
+
       const response = await fetch("{% url 'upload_file' %}", {
         method: "POST",
         body: formData,
@@ -243,15 +351,25 @@
       if (result.status === "ok") {
         sessionStorage.setItem(
           `delete-token:${result.session_id}`,
-          result.delete_token,
+          result.delete_token
         );
+        if (encryptionKeyB64) {
+          sessionStorage.setItem(
+            `encryption-key:${result.session_id}`,
+            encryptionKeyB64
+          );
+        }
         window.location.href = `/qr/${result.session_id}/`;
       } else {
+        hideStatus();
+        uploadBtn.disabled = false;
         alert("Upload failed: " + (result.error || "Unknown error"));
       }
     } catch (error) {
       console.error(error);
-      alert("Network error");
+      hideStatus();
+      uploadBtn.disabled = false;
+      alert("Upload failed: " + error.message);
     }
   });
 </script>

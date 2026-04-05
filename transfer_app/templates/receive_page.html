@@ -32,9 +32,9 @@
                         </p>
                     </div>
 
-                    <form method="POST" class="flex flex-col gap-3.5">
+                    <form method="POST" id="receive-form" class="flex flex-col gap-3.5">
                         {% csrf_token %}
-                        <input type="text" name="session_id" required
+                        <input type="text" name="session_id" id="session-code-input" required
                             class="glass-input w-full rounded-2xl px-4 py-4 text-center text-xl font-mono tracking-[0.3em] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
                             placeholder="ENTER CODE" />
                         <button type="submit"
@@ -75,4 +75,28 @@
         </div>
     </div>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Handle combined session_id#key codes:
+    // Store the encryption key in sessionStorage so the download page can use it.
+    document.getElementById("receive-form").addEventListener("submit", function(e) {
+        var input = document.getElementById("session-code-input");
+        var value = input.value.trim();
+
+        if (value.includes("#")) {
+            var parts = value.split("#");
+            var sessionId = parts[0];
+            var key = parts.slice(1).join("#");
+
+            if (key) {
+                sessionStorage.setItem("encryption-key:" + sessionId, key);
+            }
+            // Set form value to just the session_id for server validation
+            input.value = sessionId;
+        }
+        // Let form submit normally
+    });
+</script>
 {% endblock %}

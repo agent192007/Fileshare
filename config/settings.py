@@ -30,6 +30,23 @@ MAX_FILES_PER_SESSION = int(os.getenv("MAX_FILES_PER_SESSION", "20"))
 MAX_FILE_SIZE_BYTES = int(os.getenv("MAX_FILE_SIZE_BYTES", str(25 * 1024 * 1024)))
 MAX_TOTAL_UPLOAD_BYTES = int(os.getenv("MAX_TOTAL_UPLOAD_BYTES", str(100 * 1024 * 1024)))
 
+# Session expiration (hours)
+SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "24"))
+
+# Blocked file extensions
+BLOCKED_FILE_EXTENSIONS = [
+    ext.strip()
+    for ext in os.getenv(
+        "BLOCKED_FILE_EXTENSIONS",
+        ".exe,.bat,.cmd,.sh,.ps1,.msi,.scr,.com,.pif,.vbs,.wsh,.wsf,.cpl,.inf",
+    ).split(",")
+    if ext.strip()
+]
+
+# Rate limiting (uploads per window per IP)
+UPLOAD_RATE_LIMIT = int(os.getenv("UPLOAD_RATE_LIMIT", "10"))
+UPLOAD_RATE_WINDOW = int(os.getenv("UPLOAD_RATE_WINDOW", "60"))
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
